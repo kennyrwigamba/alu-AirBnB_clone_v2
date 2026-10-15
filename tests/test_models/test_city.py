@@ -1,24 +1,15 @@
 #!/usr/bin/python3
-""" """
-from tests.test_models.test_base_model import test_basemodel
+"""Validate the City model and its inherited behavior."""
+
 from models.city import City
+from tests.test_models import test_base_model
 
 
-class test_City(test_basemodel):
-    """ """
+class TestCity(test_base_model.TestBaseModel):
+    """Check City defaults and common model operations."""
 
-    def __init__(self, *args, **kwargs):
-        """ """
-        super().__init__(*args, **kwargs)
-        self.name = "City"
-        self.value = City
-
-    def test_state_id(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.state_id), str)
-
-    def test_name(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.name), str)
+    model_class = City
+    defaults = {
+        'state_id': '',
+        'name': '',
+    }

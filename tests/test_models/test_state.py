@@ -1,19 +1,14 @@
 #!/usr/bin/python3
-""" """
-from tests.test_models.test_base_model import test_basemodel
+"""Validate the State model and its inherited behavior."""
+
 from models.state import State
+from tests.test_models import test_base_model
 
 
-class test_state(test_basemodel):
-    """ """
+class TestState(test_base_model.TestBaseModel):
+    """Check State defaults and common model operations."""
 
-    def __init__(self, *args, **kwargs):
-        """ """
-        super().__init__(*args, **kwargs)
-        self.name = "State"
-        self.value = State
-
-    def test_name3(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.name), str)
+    model_class = State
+    defaults = {
+        'name': '',
+    }

@@ -1,29 +1,16 @@
 #!/usr/bin/python3
-""" """
-from tests.test_models.test_base_model import test_basemodel
+"""Validate the Review model and its inherited behavior."""
+
 from models.review import Review
+from tests.test_models import test_base_model
 
 
-class test_review(test_basemodel):
-    """ """
+class TestReview(test_base_model.TestBaseModel):
+    """Check Review defaults and common model operations."""
 
-    def __init__(self, *args, **kwargs):
-        """ """
-        super().__init__(*args, **kwargs)
-        self.name = "Review"
-        self.value = Review
-
-    def test_place_id(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.place_id), str)
-
-    def test_user_id(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.user_id), str)
-
-    def test_text(self):
-        """ """
-        new = self.value()
-        self.assertEqual(type(new.text), str)
+    model_class = Review
+    defaults = {
+        'place_id': '',
+        'user_id': '',
+        'text': '',
+    }
