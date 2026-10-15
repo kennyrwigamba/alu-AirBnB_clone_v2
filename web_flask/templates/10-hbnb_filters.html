@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>HBNB</title>
+  </head>
+  <body>
+    <h1>Available filters</h1>
+    <h2>States</h2>
+    <ul>
+      {% for state in states %}
+        <li>{{ state.name }}</li>
+      {% endfor %}
+    </ul>
+    <h2>Cities</h2>
+    <ul>
+      {% for city in cities %}
+        <li>{{ city.name }}</li>
+      {% endfor %}
+    </ul>
+    <h2>Amenities</h2>
+    <ul>
+      {% for amenity in amenities %}
+        <li>{{ amenity.name }}</li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>

@@ -2,21 +2,25 @@
 """Base model shared by all application entities."""
 
 from datetime import datetime
+import os
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime, String
-from sqlalchemy.ext.declarative import declarative_base
+if os.getenv("HBNB_TYPE_STORAGE") == "db":
+    from sqlalchemy import Column, DateTime, String
+    from sqlalchemy.ext.declarative import declarative_base
 
-
-Base = declarative_base()
+    Base = declarative_base()
+else:
+    Base = object
 
 
 class BaseModel:
     """Provide identity, timestamps, and serialization for a model."""
 
-    id = Column(String(60), primary_key=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    if os.getenv("HBNB_TYPE_STORAGE") == "db":
+        id = Column(String(60), primary_key=True, nullable=False)
+        created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+        updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     def __init__(self, *args, **kwargs):
         """Create a model from keyword data or default values."""

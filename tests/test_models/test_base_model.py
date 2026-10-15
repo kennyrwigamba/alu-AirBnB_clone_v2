@@ -3,36 +3,20 @@
 
 from datetime import datetime, timedelta
 import json
-from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import patch
 from uuid import UUID
 
 from models import storage
 from models.base_model import BaseModel
-from models.engine.file_storage import FileStorage
+from tests.storage_test_case import DB_STORAGE, StorageTestCase
 
 
-class TestBaseModel(unittest.TestCase):
+class TestBaseModel(StorageTestCase):
     """Exercise common behavior for BaseModel and each derived model."""
 
     model_class = BaseModel
     defaults = {}
-
-    def setUp(self):
-        """Isolate each test from real storage objects and files."""
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.path = Path(temporary.name) / "file.json"
-        objects = patch.object(FileStorage, "_FileStorage__objects", {})
-        file_path = patch.object(
-            FileStorage, "_FileStorage__file_path", str(self.path)
-        )
-        objects.start()
-        self.addCleanup(objects.stop)
-        file_path.start()
-        self.addCleanup(file_path.stop)
 
     def test_identity(self):
         """New instances have distinct string UUIDs of version four."""
@@ -43,19 +27,22 @@ class TestBaseModel(unittest.TestCase):
 
     def test_timestamps(self):
         """New timestamps are datetime values within construction time."""
-        before = datetime.now()
+        before = datetime.utcnow()
         model = self.model_class()
-        after = datetime.now()
+        after = datetime.utcnow()
         for value in (model.created_at, model.updated_at):
             self.assertIsInstance(value, datetime)
             self.assertLessEqual(before, value)
             self.assertLessEqual(value, after)
 
     def test_registration(self):
-        """Construction immediately registers the new model in storage."""
-        model = self.model_class()
-        key = "{}.{}".format(self.model_class.__name__, model.id)
-        self.assertIs(storage.all()[key], model)
+        """New models are registered when saved, not when constructed."""
+        with patch.object(storage, "new") as new:
+            model = self.model_class()
+            new.assert_not_called()
+            with patch.object(storage, "save"):
+                model.save()
+            new.assert_called_once_with(model)
 
     def test_args_ignored(self):
         """Positional arguments do not become model attributes."""
@@ -77,6 +64,7 @@ class TestBaseModel(unittest.TestCase):
         model.custom_number = 89
         data = model.to_dict()
         expected = model.__dict__.copy()
+        expected.pop("_sa_instance_state", None)
         expected.update({
             "__class__": self.model_class.__name__,
             "created_at": model.created_at.isoformat(),
@@ -100,32 +88,32 @@ class TestBaseModel(unittest.TestCase):
         model.custom_text = "Restored value"
         restored = self.model_class(**model.to_dict())
         self.assertIsNot(restored, model)
-        self.assertEqual(restored.__dict__, model.__dict__)
+        self.assertEqual(restored.to_dict(), model.to_dict())
         self.assertNotIn("__class__", restored.__dict__)
 
     def test_reconstruction_does_not_register(self):
         """Dictionary construction does not register a new object."""
         data = self.model_class().to_dict()
-        storage.all().clear()
         with patch.object(storage, "new") as new:
             self.model_class(**data)
         new.assert_not_called()
-        self.assertEqual(storage.all(), {})
 
     def test_save(self):
-        """Saving advances updated_at, preserves created_at, and writes."""
+        """Saving advances updated_at and registers before committing."""
         model = self.model_class()
         created = model.created_at
         later = model.updated_at + timedelta(seconds=1)
-        with patch("models.base_model.datetime") as clock:
-            clock.now.return_value = later
+        with patch("models.base_model.datetime") as clock, \
+                patch.object(storage, "new") as new, \
+                patch.object(storage, "save") as save:
+            clock.utcnow.return_value = later
             model.save()
+        new.assert_called_once_with(model)
+        save.assert_called_once_with()
         self.assertEqual(model.updated_at, later)
         self.assertEqual(model.created_at, created)
-        data = json.loads(self.path.read_text())
-        key = "{}.{}".format(self.model_class.__name__, model.id)
-        self.assertEqual(data[key], model.to_dict())
 
+    @unittest.skipIf(DB_STORAGE, "SQL columns replace file defaults")
     def test_defaults_and_inheritance(self):
         """Derived models inherit BaseModel and declare typed defaults."""
         model = self.model_class()
@@ -149,3 +137,23 @@ class TestBaseModel(unittest.TestCase):
                 data[name] = 1.5
         restored = self.model_class(**data)
         self.assertEqual(restored.to_dict(), data)
+
+    def test_delete(self):
+        """Deletion delegates the instance to the selected storage."""
+        model = self.model_class()
+        with patch.object(storage, "delete") as delete:
+            model.delete()
+        delete.assert_called_once_with(model)
+
+    def test_dictionary_hides_sqlalchemy_state(self):
+        """SQLAlchemy instrumentation is absent from serialized data."""
+        model = self.model_class()
+        self.assertNotIn("_sa_instance_state", model.to_dict())
+
+    def test_missing_keyword_timestamps(self):
+        """Partial keyword data receives fresh identity and timestamps."""
+        model = self.model_class(custom_text="value")
+        self.assertIsInstance(model.id, str)
+        self.assertIsInstance(model.created_at, datetime)
+        self.assertIsInstance(model.updated_at, datetime)
+        self.assertEqual(model.custom_text, "value")

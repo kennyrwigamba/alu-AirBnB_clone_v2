@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 """Command interpreter for the AirBnB clone."""
 
+import ast
 import cmd
+import re
 import shlex
 
 from models import storage
@@ -51,23 +53,46 @@ class HBNBCommand(cmd.Cmd):
             if "=" not in argument:
                 continue
             key, value = argument.split("=", 1)
-            default = getattr(model_class, key, None)
-            column_type = getattr(
-                getattr(default, "property", None), "columns", []
-            )
-            if column_type:
-                default = column_type[0].type
-                default = getattr(default, "python_type", str)
-            if isinstance(default, bool):
-                value = value.lower() == "true"
-            elif isinstance(default, int):
-                value = int(value)
-            elif isinstance(default, float):
-                value = float(value)
-            elif default in (int, float):
-                value = default(value)
+            if not key or not value:
+                continue
+            try:
+                if value.startswith('"'):
+                    if not value.endswith('"'):
+                        continue
+                    value = shlex.split(value)[0].replace("_", " ")
+                elif "." in value:
+                    value = float(value)
+                else:
+                    value = int(value)
+            except (ValueError, IndexError):
+                continue
             attributes[key] = value
         return attributes
+
+    def default(self, line):
+        """Support Class.command(...) without evaluating executable code."""
+        match = re.fullmatch(r"(\w+)\.(\w+)\((.*)\)", line.strip())
+        if match is None:
+            return super().default(line)
+        class_name, command, parameters = match.groups()
+        if command not in ("all", "count", "show", "destroy", "update"):
+            return super().default(line)
+        try:
+            arguments = ast.literal_eval("(" + parameters + ",)") \
+                if parameters.strip() else ()
+        except (ValueError, SyntaxError):
+            return super().default(line)
+        if command == "update" and len(arguments) == 2 \
+                and isinstance(arguments[1], dict):
+            for key, value in arguments[1].items():
+                self.do_update(" ".join(shlex.quote(str(item)) for item in (
+                    class_name, arguments[0], key, value,
+                )))
+            return
+        return self.onecmd(" ".join([
+            command, class_name,
+            *(shlex.quote(str(value)) for value in arguments),
+        ]))
 
     def do_quit(self, line):
         """Quit command to exit the program."""
@@ -80,7 +105,7 @@ class HBNBCommand(cmd.Cmd):
 
     def do_create(self, line):
         """Create, persist, and print the ID of a model instance."""
-        arguments = self._arguments(line)
+        arguments = re.findall(r'[^\s=]+="(?:\\.|[^"\\])*"|\S+', line)
         if not arguments:
             print("** class name missing **")
             return
@@ -89,9 +114,7 @@ class HBNBCommand(cmd.Cmd):
             print("** class doesn't exist **")
             return
         attributes = self._create_attributes(model_class, arguments)
-        instance = model_class()
-        for key, value in attributes.items():
-            setattr(instance, key, value)
+        instance = model_class(**attributes)
         instance.save()
         print(instance.id)
 
@@ -146,6 +169,17 @@ class HBNBCommand(cmd.Cmd):
             )
         print([str(instance) for instance in objects])
 
+    def do_count(self, line):
+        """Print the number of instances belonging to a model class."""
+        arguments = self._arguments(line)
+        if not arguments:
+            print("** class name missing **")
+        elif arguments[0] not in self.classes:
+            print("** class doesn't exist **")
+        else:
+            print(sum(instance.__class__.__name__ == arguments[0]
+                      for instance in storage.all().values()))
+
     def do_update(self, line):
         """Update one simple attribute and persist the model instance."""
         arguments = self._arguments(line)
@@ -170,14 +204,22 @@ class HBNBCommand(cmd.Cmd):
             return
 
         attribute = arguments[2]
+        if attribute in ("id", "created_at", "updated_at"):
+            return
         value = arguments[3]
         current_value = getattr(instance, attribute, None)
         if isinstance(current_value, bool):
             value = value.lower() == "true"
-        elif isinstance(current_value, int):
-            value = int(value)
-        elif isinstance(current_value, float):
-            value = float(value)
+        else:
+            field = getattr(type(instance), attribute, None)
+            columns = getattr(getattr(field, "property", None), "columns", [])
+            value_type = columns[0].type.python_type if columns \
+                else type(current_value)
+            if value_type in (int, float):
+                try:
+                    value = value_type(value)
+                except ValueError:
+                    return
         setattr(instance, attribute, value)
         instance.save()
 

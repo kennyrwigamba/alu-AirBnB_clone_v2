@@ -9,8 +9,9 @@ objects to `file.json` and restores them when the application starts.
 
 ## Starting the console
 
-The assignment targets Python 3.8.5 on Ubuntu 20.04. No third-party packages are
-required to run the application. From the repository root, run:
+The assignment targets Python 3.8.5 on Ubuntu 20.04. FileStorage requires only
+the Python standard library. MySQL storage requires SQLAlchemy 1.4 and
+mysqlclient. From the repository root, run:
 
 ```sh
 ./console.py
@@ -25,11 +26,12 @@ command description. Use `quit` or EOF (Ctrl+D) to exit. Empty lines do nothing.
 
 | Command | Usage | Purpose |
 | --- | --- | --- |
-| create | `create <class>` | Create and save an object; print its ID. |
+| create | `create <class> [key=value ...]` | Create and save an object; print its ID. |
 | show | `show <class> <id>` | Print an object. |
 | all | `all [class]` | Print all objects, optionally filtered by class. |
 | update | `update <class> <id> <attribute> "<value>"` | Update and save one attribute. |
 | destroy | `destroy <class> <id>` | Delete an object and save the removal. |
+| count | `count <class>` | Print the number of objects of a class. |
 | help | `help [command]` | Display command help. |
 | quit / EOF | `quit` or Ctrl+D | Exit the console. |
 
@@ -37,6 +39,12 @@ Use double quotes for values containing spaces. Existing integer and float
 attributes retain their types when updated. Only the first attribute/value pair
 is used. Do not update `id`, `created_at`, or `updated_at`; list and datetime
 attributes are outside the update command's scope.
+
+For `create`, quote strings and use underscores for spaces, for example
+`create State name="New_York"`. Unquoted integers and decimal numbers are
+converted to their numeric types; invalid parameters are skipped. Dotted
+commands such as `State.all()`, `State.count()`, and
+`State.update("<id>", {"name": "New York"})` are also supported.
 
 ## Examples
 
@@ -74,9 +82,23 @@ python3 -m unittest tests/test_models/test_base_model.py
 echo "python3 -m unittest discover tests" | bash
 ```
 
-Tests mirror the model package and use temporary storage files, preserving
-existing application data. They cover all model classes and the storage engine.
-The assignment does not require console unit tests.
+To test MySQL storage, prepare the dedicated test database and install its
+dependencies first:
+
+```sh
+python3 -m pip install 'SQLAlchemy==1.4.54' 'mysqlclient==2.2.7'
+mysql -uroot -p < setup_mysql_test.sql
+HBNB_ENV=test HBNB_TYPE_STORAGE=db \
+HBNB_MYSQL_USER=hbnb_test HBNB_MYSQL_PWD=hbnb_test_pwd \
+HBNB_MYSQL_HOST=localhost HBNB_MYSQL_DB=hbnb_test_db \
+python3 -m unittest discover tests
+```
+
+`HBNB_ENV=test` clears the selected database's tables when storage is created;
+use the dedicated test database. Tests cover the console, every model, and both
+storage engines. File tests use temporary files; database tests roll back their
+transactions after each test. Engine-specific tests use unittest skip decorators
+when the other storage engine is selected. New objects enter storage on `save()`.
 
 For the assignment's style check, install and run pycodestyle 2.7.*:
 
@@ -89,6 +111,7 @@ python3 -m pycodestyle console.py models tests
 
 - `console.py`: command interpreter.
 - `models/`: model definitions and application storage instance.
-- `models/engine/`: JSON storage engine.
+- `models/engine/`: JSON and MySQL storage engines.
+- `tests/test_console.py`: command validation and console persistence tests.
 - `tests/test_models/`: model and storage unit tests.
 - `AUTHORS`: repository contributors.

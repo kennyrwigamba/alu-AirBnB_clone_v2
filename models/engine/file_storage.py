@@ -32,6 +32,10 @@ class FileStorage:
         """Return all stored objects, optionally filtered by class."""
         if cls is None:
             return self.__objects
+        if isinstance(cls, str):
+            cls = self.__classes.get(cls)
+            if cls is None:
+                return {}
         return {
             key: value for key, value in self.__objects.items()
             if isinstance(value, cls)

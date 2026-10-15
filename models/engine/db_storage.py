@@ -31,10 +31,17 @@ class DBStorage:
             user, password, host, database
         )
         self.__engine = create_engine(url, pool_pre_ping=True)
+        if os.getenv("HBNB_ENV") == "test":
+            Base.metadata.drop_all(self.__engine)
 
     def all(self, cls=None):
         """Return all database objects, optionally filtered by class."""
         classes = (User, State, City, Amenity, Place, Review)
+        if isinstance(cls, str):
+            cls = next((model for model in classes
+                        if model.__name__ == cls), None)
+            if cls is None:
+                return {}
         if cls is not None:
             classes = (cls,)
         objects = {}
@@ -61,8 +68,6 @@ class DBStorage:
 
     def reload(self):
         """Create tables and initialize a thread-safe database session."""
-        if os.getenv("HBNB_ENV") == "test":
-            Base.metadata.drop_all(self.__engine)
         Base.metadata.create_all(self.__engine)
         factory = sessionmaker(
             bind=self.__engine,

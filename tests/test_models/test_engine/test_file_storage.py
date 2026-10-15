@@ -18,8 +18,10 @@ from models.review import Review
 from models.state import State
 from models.user import User
 from tests.test_models import test_base_model
+from tests.storage_test_case import DB_STORAGE
 
 
+@unittest.skipIf(DB_STORAGE, "FileStorage tests require file storage")
 class TestFileStorage(unittest.TestCase):
     """Check the storage engine with isolated files and object mappings."""
 
@@ -45,6 +47,7 @@ class TestFileStorage(unittest.TestCase):
         for model_class in classes:
             model = model_class()
             model.custom_text = "Text with spaces"
+            storage.new(model)
             key = "{}.{}".format(model_class.__name__, model.id)
             expected[key] = model.to_dict()
         storage.save()
@@ -59,6 +62,7 @@ class TestFileStorage(unittest.TestCase):
     def test_reload_missing_file(self):
         """A missing storage file raises no error and preserves objects."""
         model = BaseModel()
+        storage.new(model)
         storage.reload()
         self.assertIs(storage.all()["BaseModel." + model.id], model)
         self.assertFalse(self.path.exists())
@@ -100,3 +104,37 @@ class TestFileStorage(unittest.TestCase):
         self.assertEqual(
             json.loads(result.stdout), {"User." + model.id: model.to_dict()}
         )
+
+    def test_filter_by_class(self):
+        """Class filters exclude objects of other model types."""
+        state, user = State(), User()
+        state.save()
+        user.save()
+        expected = {"State." + state.id: state}
+        self.assertEqual(storage.all(State), expected)
+        self.assertEqual(storage.all("State"), expected)
+
+    def test_delete_missing_object(self):
+        """Deleting None or an unstored object preserves saved objects."""
+        state = State()
+        state.save()
+        storage.delete()
+        storage.delete(State())
+        self.assertEqual(storage.all(), {"State." + state.id: state})
+
+    def test_delete_object(self):
+        """Public deletion removes an object and persists after saving."""
+        state = State()
+        state.save()
+        storage.delete(state)
+        storage.save()
+        storage.reload()
+        self.assertEqual(storage.all(), {})
+
+    def test_close_reloads(self):
+        """Closing file storage restores the saved objects."""
+        state = State()
+        state.save()
+        storage.all().clear()
+        storage.close()
+        self.assertIn("State." + state.id, storage.all())
