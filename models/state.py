@@ -3,11 +3,11 @@
 
 import os
 
+from models.base_model import Base, BaseModel
+
 if os.getenv("HBNB_TYPE_STORAGE") == "db":
     from sqlalchemy import Column, String
     from sqlalchemy.orm import relationship
-
-from models.base_model import Base, BaseModel
 
 
 class State(BaseModel, Base):
@@ -16,23 +16,17 @@ class State(BaseModel, Base):
     if os.getenv("HBNB_TYPE_STORAGE") == "db":
         __tablename__ = "states"
         name = Column(String(128), nullable=False)
+        cities = relationship(
+            "City", backref="state", cascade="all, delete, delete-orphan",
+        )
     else:
         name = ""
 
+        @property
+        def cities(self):
+            """Return saved cities whose state_id matches this state."""
+            from models import storage
+            from models.city import City
 
-if os.getenv("HBNB_TYPE_STORAGE") == "db":
-    State.cities = relationship(
-        "City",
-        backref="state",
-        cascade="all, delete, delete-orphan",
-    )
-else:
-    State.cities = property(
-        lambda self: [
-            city for city in __import__("models").storage.all().values()
-            if (
-                city.__class__.__name__ == "City" and
-                city.state_id == self.id
-            )
-        ]
-    )
+            return [city for city in storage.all(City).values()
+                    if city.state_id == self.id]

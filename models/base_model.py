@@ -35,7 +35,10 @@ class BaseModel:
             if key in ("created_at", "updated_at") and isinstance(
                 value, str
             ):
-                value = datetime.fromisoformat(value)
+                date_format = "%Y-%m-%dT%H:%M:%S"
+                if "." in value:
+                    date_format += ".%f"
+                value = datetime.strptime(value, date_format)
             if key != "__class__":
                 setattr(self, key, value)
 

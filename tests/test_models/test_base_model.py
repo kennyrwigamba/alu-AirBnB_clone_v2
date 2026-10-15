@@ -157,3 +157,13 @@ class TestBaseModel(StorageTestCase):
         self.assertIsInstance(model.created_at, datetime)
         self.assertIsInstance(model.updated_at, datetime)
         self.assertEqual(model.custom_text, "value")
+
+    def test_timestamps_without_microseconds(self):
+        """ISO timestamps with whole seconds deserialize correctly."""
+        value = "2017-03-25T19:42:40"
+        model = self.model_class(created_at=value, updated_at=value)
+        expected = datetime(2017, 3, 25, 19, 42, 40)
+        self.assertEqual(model.created_at, expected)
+        self.assertEqual(model.updated_at, expected)
+        restored = self.model_class(**model.to_dict())
+        self.assertEqual(restored.to_dict(), model.to_dict())

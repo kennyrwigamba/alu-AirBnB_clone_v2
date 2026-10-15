@@ -3,11 +3,11 @@
 
 import os
 
+from models.base_model import Base, BaseModel
+
 if os.getenv("HBNB_TYPE_STORAGE") == "db":
     from sqlalchemy import Column, String
     from sqlalchemy.orm import relationship
-
-from models.base_model import Base, BaseModel
 
 
 class User(BaseModel, Base):

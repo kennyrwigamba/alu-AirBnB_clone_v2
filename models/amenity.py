@@ -3,10 +3,10 @@
 
 import os
 
+from models.base_model import Base, BaseModel
+
 if os.getenv("HBNB_TYPE_STORAGE") == "db":
     from sqlalchemy import Column, String
-
-from models.base_model import Base, BaseModel
 
 
 class Amenity(BaseModel, Base):

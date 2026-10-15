@@ -3,11 +3,10 @@
 
 import os
 
-if os.getenv("HBNB_TYPE_STORAGE") == "db":
-    from sqlalchemy import Column, Float, ForeignKey, Integer, String, Table
-
 from models.base_model import Base, BaseModel
 
+if os.getenv("HBNB_TYPE_STORAGE") == "db":
+    from sqlalchemy import Column, Float, ForeignKey, Integer, String, Table
 
 if os.getenv("HBNB_TYPE_STORAGE") == "db":
     place_amenity = Table(
@@ -93,7 +92,7 @@ else:
     Place.reviews = property(
         lambda self: [
             review for review in __import__("models").storage.all().values()
-            if review.__class__.__name__ == "Review"
-            and review.place_id == self.id
+            if (review.__class__.__name__ == "Review" and
+                review.place_id == self.id)
         ]
     )

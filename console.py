@@ -89,10 +89,9 @@ class HBNBCommand(cmd.Cmd):
                     class_name, arguments[0], key, value,
                 )))
             return
-        return self.onecmd(" ".join([
-            command, class_name,
-            *(shlex.quote(str(value)) for value in arguments),
-        ]))
+        command_parts = [command, class_name]
+        command_parts.extend(shlex.quote(str(value)) for value in arguments)
+        return self.onecmd(" ".join(command_parts))
 
     def do_quit(self, line):
         """Quit command to exit the program."""

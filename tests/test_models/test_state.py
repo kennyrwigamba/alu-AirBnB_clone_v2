@@ -27,3 +27,22 @@ class TestState(test_base_model.TestBaseModel):
         unrelated.save()
         self.assertEqual(state.cities, [city])
         self.assertEqual(other.cities, [unrelated])
+
+    @unittest.skipIf(DB_STORAGE, "FileStorage relationship getter")
+    def test_cities_refresh_after_close(self):
+        """Reloaded states still resolve the cities saved in JSON storage."""
+        from models import storage
+
+        state = State(name="California")
+        state.save()
+        city = City(state_id=state.id, name="Napa")
+        city.save()
+        storage.all().clear()
+        storage.close()
+        restored = storage.all(State)["State." + state.id]
+        self.assertEqual([item.id for item in restored.cities], [city.id])
+
+    @unittest.skipIf(DB_STORAGE, "FileStorage relationship getter")
+    def test_cities_with_no_matches(self):
+        """States without matching saved cities return an empty list."""
+        self.assertEqual(State(name="Empty").cities, [])
