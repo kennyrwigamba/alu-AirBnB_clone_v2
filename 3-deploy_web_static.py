@@ -3,7 +3,7 @@
 
 from fabric.api import env
 
-env.hosts = ["184.73.19.238", "35.175.218.108"]
+env.hosts = ["44.212.60.247", "3.82.250.215"]
 
 pack = __import__("1-pack_web_static")
 deployer = __import__("2-do_deploy_web_static")

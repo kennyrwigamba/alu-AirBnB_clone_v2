@@ -65,8 +65,9 @@ fi
 "${sudo_cmd[@]}" sed -i \
     '/# BEGIN hbnb_static/,/# END hbnb_static/d;\|^[[:space:]]*include /etc/nginx/snippets/hbnb_static\.conf;[[:space:]]*$|d' \
     "$nginx_site"
-"${sudo_cmd[@]}" sed -i '/^[[:space:]]*server[[:space:]]*{/a\
-    include /etc/nginx/snippets/hbnb_static.conf;' "$nginx_site"
+"${sudo_cmd[@]}" sed -i \
+    '/^[[:space:]]*server[[:space:]]*{/a\    include /etc/nginx/snippets/hbnb_static.conf;' \
+    "$nginx_site"
 "${sudo_cmd[@]}" ln -sfn "$nginx_site" /etc/nginx/sites-enabled/default
 
 if "${sudo_cmd[@]}" nginx -t; then
