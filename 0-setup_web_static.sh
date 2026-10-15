@@ -1,43 +1,76 @@
 #!/usr/bin/env bash
-# Set up the directory tree and Nginx configuration for web_static.
+# Prepare the web_static directories, ownership, and Nginx alias on Ubuntu.
 
-if [ "$(id -u)" -eq 0 ]; then
-    SUDO=""
-else
-    SUDO="sudo"
+sudo_cmd=()
+if [ "$(id -u)" -ne 0 ]; then
+    sudo_cmd=(sudo)
 fi
 
-$SUDO apt-get update -y >/dev/null 2>&1
-$SUDO apt-get install -y nginx >/dev/null 2>&1
+umask 022
 
-$SUDO mkdir -p \
-    /data/web_static/releases/test \
-    /data/web_static/shared
-
-printf '%s\n' '<html><body>Web static is working!</body></html>' |
-    $SUDO tee /data/web_static/releases/test/index.html >/dev/null
-
-$SUDO rm -f /data/web_static/current
-$SUDO ln -s /data/web_static/releases/test /data/web_static/current
-
-$SUDO chown -R ubuntu:ubuntu /data
-
-NGINX_SITE="/etc/nginx/sites-available/default"
-LOCATION_START="        # BEGIN hbnb_static"
-LOCATION_END="        # END hbnb_static"
-
-if $SUDO test -f "$NGINX_SITE"; then
-    $SUDO sed -i "/$LOCATION_START/,/$LOCATION_END/d" "$NGINX_SITE"
-    $SUDO sed -i "/^[[:space:]]*location \\/[[:space:]]*{/i\\
-$LOCATION_START\\
-        location /hbnb_static/ {\\
-            alias /data/web_static/current/;\\
-        }\\
-$LOCATION_END\\
-" "$NGINX_SITE"
+if ! command -v nginx >/dev/null 2>&1; then
+    "${sudo_cmd[@]}" apt-get update
+    "${sudo_cmd[@]}" apt-get install -y nginx
 fi
 
-$SUDO nginx -t >/dev/null 2>&1
-$SUDO service nginx restart >/dev/null 2>&1
+"${sudo_cmd[@]}" mkdir -p /data/web_static/releases/test /data/web_static/shared
+"${sudo_cmd[@]}" tee /data/web_static/releases/test/index.html >/dev/null <<'HTML'
+<html>
+  <head>
+  </head>
+  <body>
+    Holberton School
+  </body>
+</html>
+HTML
+
+"${sudo_cmd[@]}" rm -f /data/web_static/current
+"${sudo_cmd[@]}" ln -s /data/web_static/releases/test /data/web_static/current
+"${sudo_cmd[@]}" chmod 755 /data /data/web_static /data/web_static/releases \
+    /data/web_static/releases/test /data/web_static/shared
+"${sudo_cmd[@]}" chmod 644 /data/web_static/releases/test/index.html
+"${sudo_cmd[@]}" chown -hR ubuntu:ubuntu /data
+
+"${sudo_cmd[@]}" mkdir -p /etc/nginx/snippets /etc/nginx/sites-available \
+    /etc/nginx/sites-enabled
+"${sudo_cmd[@]}" tee /etc/nginx/snippets/hbnb_static.conf >/dev/null <<'NGINX'
+location = /hbnb_static {
+    return 301 /hbnb_static/;
+}
+
+location /hbnb_static/ {
+    alias /data/web_static/current/;
+    index index.html;
+}
+NGINX
+
+nginx_site=/etc/nginx/sites-available/default
+if ! "${sudo_cmd[@]}" test -f "$nginx_site"; then
+    "${sudo_cmd[@]}" tee "$nginx_site" >/dev/null <<'NGINX'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    root /var/www/html;
+    index index.html index.htm;
+    server_name _;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+NGINX
+fi
+
+# Remove our previous configuration before inserting one include per server.
+"${sudo_cmd[@]}" sed -i \
+    '/# BEGIN hbnb_static/,/# END hbnb_static/d;\|^[[:space:]]*include /etc/nginx/snippets/hbnb_static\.conf;[[:space:]]*$|d' \
+    "$nginx_site"
+"${sudo_cmd[@]}" sed -i '/^[[:space:]]*server[[:space:]]*{/a\
+    include /etc/nginx/snippets/hbnb_static.conf;' "$nginx_site"
+"${sudo_cmd[@]}" ln -sfn "$nginx_site" /etc/nginx/sites-enabled/default
+
+if "${sudo_cmd[@]}" nginx -t; then
+    "${sudo_cmd[@]}" service nginx restart
+fi
 
 exit 0
